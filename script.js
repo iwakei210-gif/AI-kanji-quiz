@@ -1,4 +1,7 @@
 const QUESTIONS_PER_QUIZ = 20;
+const HISTORY_STORAGE_KEY = "kanji-quiz-history";
+const HISTORY_MAX_ENTRIES = 50;
+const HISTORY_DISPLAY_LIMIT = 5;
 
 const kanjiEl = document.getElementById("kanji");
 const choicesEl = document.getElementById("choices");
@@ -11,13 +14,18 @@ const scoreDisplayEl = document.getElementById("score-display");
 const quizScreen = document.getElementById("quiz-screen");
 const resultScreen = document.getElementById("result-screen");
 const finalScoreEl = document.getElementById("final-score");
+const resultDurationEl = document.getElementById("result-duration");
 const resultMessageEl = document.getElementById("result-message");
 const restartBtn = document.getElementById("restart-btn");
+const historyStatsEl = document.getElementById("history-stats");
+const historyListEl = document.getElementById("history-list");
+const clearHistoryBtn = document.getElementById("clear-history-btn");
 
 let currentIndex = 0;
 let score = 0;
 let quizQuestions = [];
 let questionPool = [];
+let quizStartAt = 0;
 
 function shuffle(array) {
     const arr = array.slice();
@@ -46,9 +54,90 @@ function startQuiz() {
     currentIndex = 0;
     score = 0;
     quizQuestions = pickQuizQuestions();
+    quizStartAt = Date.now();
     resultScreen.classList.add("hidden");
     quizScreen.classList.remove("hidden");
     renderQuestion();
+}
+
+function loadHistory() {
+    try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveHistory(history) {
+    try {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+    } catch (e) {
+        // localStorageが使えない場合は静かに失敗
+    }
+}
+
+function appendHistoryEntry(entry) {
+    const history = loadHistory();
+    history.push(entry);
+    if (history.length > HISTORY_MAX_ENTRIES) {
+        history.splice(0, history.length - HISTORY_MAX_ENTRIES);
+    }
+    saveHistory(history);
+}
+
+function formatDateTime(ts) {
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${y}/${m}/${day} ${h}:${mi}`;
+}
+
+function formatDuration(ms) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    if (min > 0) return `${min}分${sec}秒`;
+    return `${sec}秒`;
+}
+
+function renderHistory() {
+    const history = loadHistory();
+    if (history.length === 0) {
+        historyStatsEl.textContent = "まだ記録がありません。";
+        historyListEl.innerHTML = "";
+        return;
+    }
+    const count = history.length;
+    const best = Math.max(...history.map(h => h.score));
+    const total = history[history.length - 1].total;
+    const avg = history.reduce((sum, h) => sum + h.score, 0) / count;
+    historyStatsEl.innerHTML =
+        `挑戦回数: <strong>${count}</strong>回 / ` +
+        `ベスト: <strong>${best} / ${total}</strong> / ` +
+        `平均: <strong>${avg.toFixed(1)}</strong>点`;
+
+    const recent = history.slice(-HISTORY_DISPLAY_LIMIT).reverse();
+    historyListEl.innerHTML = recent.map(h => `
+        <li class="history-item">
+            <span class="history-date">${formatDateTime(h.at)}</span>
+            <span class="history-score">${h.score} / ${h.total}</span>
+            <span class="history-duration">${formatDuration(h.durationMs)}</span>
+        </li>
+    `).join("");
+}
+
+function clearHistory() {
+    if (!confirm("これまでの記録をすべて消しますか？")) return;
+    try {
+        localStorage.removeItem(HISTORY_STORAGE_KEY);
+    } catch (e) {}
+    renderHistory();
 }
 
 function renderQuestion() {
@@ -104,11 +193,22 @@ function goNext() {
 }
 
 function showResult() {
+    const total = quizQuestions.length;
+    const durationMs = Date.now() - quizStartAt;
+
     quizScreen.classList.add("hidden");
     resultScreen.classList.remove("hidden");
-    finalScoreEl.textContent = `${score} / ${quizQuestions.length}`;
+    finalScoreEl.textContent = `${score} / ${total}`;
+    resultDurationEl.textContent = `所要時間: ${formatDuration(durationMs)}`;
 
-    const total = quizQuestions.length;
+    appendHistoryEntry({
+        at: Date.now(),
+        score: score,
+        total: total,
+        durationMs: durationMs
+    });
+    renderHistory();
+
     let message;
     if (score === total) {
         message = "満点！素晴らしい！";
@@ -130,6 +230,7 @@ function showLoadError(message) {
 
 nextBtn.addEventListener("click", goNext);
 restartBtn.addEventListener("click", startQuiz);
+clearHistoryBtn.addEventListener("click", clearHistory);
 
 (async function init() {
     try {
