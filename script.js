@@ -1,4 +1,4 @@
-const QUESTIONS_PER_QUIZ = 10;
+const QUESTIONS_PER_QUIZ = 20;
 
 const kanjiEl = document.getElementById("kanji");
 const choicesEl = document.getElementById("choices");
@@ -108,12 +108,13 @@ function showResult() {
     resultScreen.classList.remove("hidden");
     finalScoreEl.textContent = `${score} / ${quizQuestions.length}`;
 
+    const total = quizQuestions.length;
     let message;
-    if (score === quizQuestions.length) {
+    if (score === total) {
         message = "満点！素晴らしい！";
-    } else if (score >= 8) {
+    } else if (score >= total * 0.8) {
         message = "とてもよくできました！";
-    } else if (score >= 5) {
+    } else if (score >= total * 0.5) {
         message = "よくがんばりました！";
     } else {
         message = "もう一度チャレンジしてみよう！";
