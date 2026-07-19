@@ -221,6 +221,23 @@ body {
     margin-top: 4px;
 }
 
+.load-error {
+    background: #fff5f5;
+    border: 2px solid #f5a5a5;
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    color: #b13b3b;
+    font-weight: 600;
+}
+
+.load-error-hint {
+    margin-top: 8px;
+    font-size: 14px;
+    color: #7a5b5b;
+    font-weight: 400;
+}
+
 @media (max-width: 360px) {
     .kanji {
         font-size: 80px;

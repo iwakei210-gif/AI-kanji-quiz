@@ -1,15 +1,4 @@
-const questions = [
-    { kanji: "英語", answer: "えいご", choices: ["えいご", "こくご", "さんすう", "りかい"] },
-    { kanji: "機械", answer: "きかい", choices: ["きかい", "きけん", "きろく", "きぼう"] },
-    { kanji: "季節", answer: "きせつ", choices: ["きせつ", "けっせき", "きろく", "きぼう"] },
-    { kanji: "自然", answer: "しぜん", choices: ["しぜん", "じねん", "てんねん", "しれん"] },
-    { kanji: "努力", answer: "どりょく", choices: ["どりょく", "きょうりょく", "たいりょく", "のうりょく"] },
-    { kanji: "成功", answer: "せいこう", choices: ["せいこう", "せいか", "せいじつ", "せいちょう"] },
-    { kanji: "希望", answer: "きぼう", choices: ["きぼう", "きたい", "きろく", "きけん"] },
-    { kanji: "健康", answer: "けんこう", choices: ["けんこう", "けんとう", "けんきゅう", "けんちく"] },
-    { kanji: "観察", answer: "かんさつ", choices: ["かんさつ", "けんさつ", "けいさつ", "かんげき"] },
-    { kanji: "説明", answer: "せつめい", choices: ["せつめい", "しょうめい", "はつめい", "ふつめい"] }
-];
+const QUESTIONS_PER_QUIZ = 10;
 
 const kanjiEl = document.getElementById("kanji");
 const choicesEl = document.getElementById("choices");
@@ -28,6 +17,7 @@ const restartBtn = document.getElementById("restart-btn");
 let currentIndex = 0;
 let score = 0;
 let quizQuestions = [];
+let questionPool = [];
 
 function shuffle(array) {
     const arr = array.slice();
@@ -38,10 +28,24 @@ function shuffle(array) {
     return arr;
 }
 
+async function loadQuestions() {
+    const res = await fetch("questions.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(`questions.json の読み込みに失敗しました (${res.status})`);
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length < QUESTIONS_PER_QUIZ) {
+        throw new Error("questions.json の問題数が不足しています");
+    }
+    return data;
+}
+
+function pickQuizQuestions() {
+    return shuffle(questionPool).slice(0, QUESTIONS_PER_QUIZ);
+}
+
 function startQuiz() {
     currentIndex = 0;
     score = 0;
-    quizQuestions = questions.slice();
+    quizQuestions = pickQuizQuestions();
     resultScreen.classList.add("hidden");
     quizScreen.classList.remove("hidden");
     renderQuestion();
@@ -117,7 +121,20 @@ function showResult() {
     resultMessageEl.textContent = message;
 }
 
+function showLoadError(message) {
+    quizScreen.innerHTML = `<div class="load-error"><p>${message}</p><p class="load-error-hint">ページを再読み込みしてください。</p></div>`;
+    quizScreen.classList.remove("hidden");
+    resultScreen.classList.add("hidden");
+}
+
 nextBtn.addEventListener("click", goNext);
 restartBtn.addEventListener("click", startQuiz);
 
-startQuiz();
+(async function init() {
+    try {
+        questionPool = await loadQuestions();
+        startQuiz();
+    } catch (err) {
+        showLoadError(err.message || "問題の読み込みに失敗しました");
+    }
+})();
